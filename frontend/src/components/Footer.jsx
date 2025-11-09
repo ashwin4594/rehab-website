@@ -107,10 +107,10 @@ export default function Footer() {
           >
             <FaMapMarkerAlt style={{ marginRight: "8px" }} /> View on Google Maps
           </a>
-        </div>
+        {/* </div>
 
         Opening Statement or Motto
-        <div style={{ maxWidth: "350px", textAlign: "center" }}>
+        <div style={{ maxWidth: "350px", textAlign: "center" }}> */}
           <h4
             style={{
               color: "#facc15",
@@ -120,7 +120,7 @@ export default function Footer() {
             }}
           >
             Our Commitment
-          </h4>
+          </h4><ln> </ln>
           <p
             style={{
               fontSize: "14px",

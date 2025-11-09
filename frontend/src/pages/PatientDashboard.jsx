@@ -12,6 +12,7 @@ export default function PatientDashboard() {
   const [doctors, setDoctors] = useState([]);
   const [formData, setFormData] = useState({
     doctorName: "",
+    phone: "",
     date: "",
     reason: "",
   });
@@ -71,16 +72,20 @@ export default function PatientDashboard() {
     e.preventDefault();
     try {
       const newAppointment = {
-        ...formData,
+        doctorName: formData.doctorName || "All Doctors",
         patientName: user?.name,
+        phone: formData.phone, // ✅ Added phone field
+        date: formData.date,
+        reason: formData.reason,
         status: "Scheduled",
       };
+
       await axios.post("http://localhost:5000/api/patient/book", newAppointment);
       toast.success("✅ Appointment booked successfully!");
       setAppointments((prev) => [...prev, newAppointment]);
-      setFormData({ doctorName: "", date: "", reason: "" });
+      setFormData({ doctorName: "", phone: "", date: "", reason: "" }); // ✅ Reset includes phone now
     } catch (err) {
-      console.error(err);
+      console.error("Error booking appointment:", err.response?.data || err.message);
       toast.error("❌ Failed to book appointment.");
     }
   };
@@ -230,7 +235,7 @@ export default function PatientDashboard() {
               onSubmit={handleSubmit}
               style={{
                 display: "grid",
-                gridTemplateColumns: "1fr 1fr 1fr auto",
+                gridTemplateColumns: "1fr 1fr 1fr 1fr auto",
                 gap: "15px",
                 alignItems: "center",
               }}
@@ -254,6 +259,21 @@ export default function PatientDashboard() {
                   </option>
                 ))}
               </select>
+
+              <input
+                type="tel"
+                name="phone"
+                placeholder="Phone Number"
+                value={formData.phone}
+                onChange={handleChange}
+                required
+                style={{
+                  padding: "10px",
+                  border: "1px solid #A5D6A7",
+                  borderRadius: "8px",
+                  fontSize: "1rem",
+                }}
+              />
 
               <input
                 type="date"
@@ -327,16 +347,10 @@ export default function PatientDashboard() {
               >
                 <thead>
                   <tr style={{ background: "#E8F5E9", color: "#2E7D32" }}>
-                    <th style={{ padding: "12px", textAlign: "left" }}>
-                      Doctor
-                    </th>
+                    <th style={{ padding: "12px", textAlign: "left" }}>Doctor</th>
                     <th style={{ padding: "12px", textAlign: "left" }}>Date</th>
-                    <th style={{ padding: "12px", textAlign: "left" }}>
-                      Reason
-                    </th>
-                    <th style={{ padding: "12px", textAlign: "left" }}>
-                      Status
-                    </th>
+                    <th style={{ padding: "12px", textAlign: "left" }}>Reason</th>
+                    <th style={{ padding: "12px", textAlign: "left" }}>Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -354,9 +368,7 @@ export default function PatientDashboard() {
                         (e.currentTarget.style.background = "white")
                       }
                     >
-                      <td style={{ padding: "12px" }}>
-                        Dr. {appt.doctorName}
-                      </td>
+                      <td style={{ padding: "12px" }}>Dr. {appt.doctorName}</td>
                       <td style={{ padding: "12px" }}>{appt.date}</td>
                       <td style={{ padding: "12px" }}>{appt.reason}</td>
                       <td

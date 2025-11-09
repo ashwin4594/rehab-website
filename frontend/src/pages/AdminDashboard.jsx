@@ -25,21 +25,32 @@ export default function AdminDashboard() {
     const user = JSON.parse(localStorage.getItem("user"));
     if (user) setAdminName(user.name);
 
-    fetchUsers();
-    fetchLeaves();
-    fetchMessages();
-    fetchPendingDoctors();
+    // load all data
+    fetchAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const fetchAll = async () => {
+    setLoading(true);
+    await Promise.allSettled([
+      fetchUsers(),
+      fetchLeaves(),
+      fetchMessages(),
+      fetchPendingDoctors(),
+    ]);
+    setLoading(false);
+  };
 
   // ✅ Fetch all users
   const fetchUsers = async () => {
     try {
       const res = await axios.get("http://localhost:5000/api/admin/users");
-      setUsers(res.data);
+      // backend might return { users: [...] } or just [...]
+      const data = res.data && res.data.users ? res.data.users : res.data;
+      setUsers(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching users:", error);
-    } finally {
-      setLoading(false);
+      setUsers([]);
     }
   };
 
@@ -47,9 +58,11 @@ export default function AdminDashboard() {
   const fetchLeaves = async () => {
     try {
       const res = await axios.get("http://localhost:5000/api/admin/leaves");
-      setLeaves(res.data);
+      const data = res.data && res.data.leaves ? res.data.leaves : res.data;
+      setLeaves(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching leaves:", error);
+      setLeaves([]);
     }
   };
 
@@ -57,9 +70,11 @@ export default function AdminDashboard() {
   const fetchMessages = async () => {
     try {
       const res = await axios.get("http://localhost:5000/api/contact/messages");
-      setMessages(res.data);
+      const data = res.data && res.data.messages ? res.data.messages : res.data;
+      setMessages(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching messages:", error);
+      setMessages([]);
     }
   };
 
@@ -67,9 +82,12 @@ export default function AdminDashboard() {
   const fetchPendingDoctors = async () => {
     try {
       const res = await axios.get("http://localhost:5000/api/admin/pending-doctors");
-      setPendingDoctors(res.data);
+      // backend may return { doctors: [...] } or [...]
+      const data = res.data && res.data.doctors ? res.data.doctors : res.data;
+      setPendingDoctors(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching pending doctors:", error);
+      setPendingDoctors([]);
     }
   };
 
@@ -77,22 +95,26 @@ export default function AdminDashboard() {
   const handleApproveDoctor = async (id) => {
     if (!window.confirm("Approve this doctor?")) return;
     try {
-      await axios.put(`http://localhost:5000/api/admin/approve-doctor/${id}`);
-      setPendingDoctors((prev) => prev.filter((doc) => doc._id !== id));
-      alert("✅ Doctor approved successfully!");
+      const res = await axios.put(`http://localhost:5000/api/admin/approve-doctor/${id}`);
+      // remove approved doctor from UI
+      setPendingDoctors((prev) => prev.filter((doc) => doc._id !== id && doc.id !== id));
+      alert(res.data?.message || "Doctor approved successfully!");
     } catch (error) {
+      console.error("Approve error:", error?.response?.data || error);
       alert("❌ Failed to approve doctor.");
     }
   };
 
-  // ✅ Reject doctor
+  // ✅ Reject doctor (delete or mark rejected depending on your backend)
   const handleRejectDoctor = async (id) => {
-    if (!window.confirm("Reject this doctor?")) return;
+    if (!window.confirm("Reject this doctor? This will remove their registration.")) return;
     try {
-      await axios.delete(`http://localhost:5000/api/admin/reject-doctor/${id}`);
-      setPendingDoctors((prev) => prev.filter((doc) => doc._id !== id));
-      alert("❌ Doctor rejected and removed!");
+      // Endpoint should remove the pending doctor. Make sure backend implements it.
+      const res = await axios.delete(`http://localhost:5000/api/admin/reject-doctor/${id}`);
+      setPendingDoctors((prev) => prev.filter((doc) => doc._id !== id && doc.id !== id));
+      alert(res.data?.message || "Doctor rejected and removed!");
     } catch (error) {
+      console.error("Reject error:", error?.response?.data || error);
       alert("❌ Failed to reject doctor.");
     }
   };
@@ -101,9 +123,9 @@ export default function AdminDashboard() {
   const handleDeleteMessage = async (id) => {
     if (!window.confirm("Are you sure you want to delete this message?")) return;
     try {
-      await axios.delete(`http://localhost:5000/api/contact/messages/${id}`);
-      setMessages((prev) => prev.filter((msg) => msg._id !== id));
-      alert("🗑️ Message deleted successfully!");
+      const res = await axios.delete(`http://localhost:5000/api/contact/messages/${id}`);
+      setMessages((prev) => prev.filter((msg) => msg._id !== id && msg.id !== id));
+      alert(res.data?.message || "Message deleted successfully!");
     } catch (error) {
       console.error("Error deleting message:", error);
       alert("❌ Failed to delete message.");
@@ -114,10 +136,11 @@ export default function AdminDashboard() {
   const handleDeleteUser = async (id) => {
     if (!window.confirm("Are you sure you want to delete this user?")) return;
     try {
-      await axios.delete(`http://localhost:5000/api/admin/users/${id}`);
-      setUsers((prev) => prev.filter((u) => u._id !== id));
-      alert("✅ User deleted successfully!");
+      const res = await axios.delete(`http://localhost:5000/api/admin/users/${id}`);
+      setUsers((prev) => prev.filter((u) => u._id !== id && u.id !== id));
+      alert(res.data?.message || "User deleted successfully!");
     } catch (error) {
+      console.error("Delete user error:", error);
       alert("❌ Failed to delete user.");
     }
   };
@@ -131,24 +154,26 @@ export default function AdminDashboard() {
           : `http://localhost:5000/api/admin/leave/reject/${id}`;
 
       const res = await axios.put(endpoint);
-      alert(res.data.message);
+      alert(res.data?.message || "Leave updated.");
 
       setLeaves((prev) =>
         prev.map((l) =>
-          l._id === id
+          l._id === id || l.id === id
             ? { ...l, status: action === "approve" ? "Approved" : "Rejected" }
             : l
         )
       );
     } catch (error) {
+      console.error("Leave action error:", error);
       alert("❌ Failed to update leave status.");
     }
   };
 
   // ✅ Count roles
   const roleCounts = users.reduce(
-    (acc, user) => {
-      acc[user.role] = (acc[user.role] || 0) + 1;
+    (acc, u) => {
+      const role = u.role || "visitor";
+      acc[role] = (acc[role] || 0) + 1;
       return acc;
     },
     { doctor: 0, staff: 0, patient: 0, admin: 0 }
@@ -252,21 +277,21 @@ export default function AdminDashboard() {
               </thead>
               <tbody>
                 {pendingDoctors.map((doc) => (
-                  <tr key={doc._id} style={trStyle}>
+                  <tr key={doc._id || doc.id} style={trStyle}>
                     <td style={tdStyle}>{doc.name}</td>
                     <td style={tdStyle}>{doc.email}</td>
                     <td style={tdStyle}>
-                      {new Date(doc.createdAt).toLocaleString()}
+                      {doc.createdAt ? new Date(doc.createdAt).toLocaleString() : "N/A"}
                     </td>
                     <td style={tdStyle}>
                       <button
-                        onClick={() => handleApproveDoctor(doc._id)}
+                        onClick={() => handleApproveDoctor(doc._id || doc.id)}
                         style={approveBtn}
                       >
                         <FaCheckCircle /> Approve
                       </button>
                       <button
-                        onClick={() => handleRejectDoctor(doc._id)}
+                        onClick={() => handleRejectDoctor(doc._id || doc.id)}
                         style={rejectBtn}
                       >
                         <FaTimesCircle /> Reject
@@ -281,7 +306,6 @@ export default function AdminDashboard() {
       )}
 
       {/* ====================== USERS, LEAVES, MESSAGES ====================== */}
-      {/* existing users, leaves, messages sections stay unchanged */}
       {tab === "users" && (
         <UserManagement
           users={users}
@@ -346,14 +370,15 @@ function UserManagement({ users, loading, roleCounts, handleDeleteUser }) {
             </thead>
             <tbody>
               {users.map((u) => (
-                <tr key={u._id} style={trStyle}>
+                <tr key={u._id || u.id} style={trStyle}>
                   <td style={tdStyle}>{u.name}</td>
                   <td style={tdStyle}>{u.email}</td>
                   <td style={{ ...tdStyle, color: "#2E7D32" }}>
-                    {u.role.charAt(0).toUpperCase() + u.role.slice(1)}
+                    {String(u.role || "visitor").charAt(0).toUpperCase() +
+                      String(u.role || "visitor").slice(1)}
                   </td>
                   <td style={tdStyle}>
-                    <button onClick={() => handleDeleteUser(u._id)} style={deleteBtn}>
+                    <button onClick={() => handleDeleteUser(u._id || u.id)} style={deleteBtn}>
                       <FaTrash /> Remove
                     </button>
                   </td>
@@ -396,7 +421,7 @@ function LeaveManagement({ leaves, handleLeaveAction }) {
           </thead>
           <tbody>
             {leaves.map((leave) => (
-              <tr key={leave._id} style={trStyle}>
+              <tr key={leave._id || leave.id} style={trStyle}>
                 <td style={tdStyle}>{leave.name}</td>
                 <td style={tdStyle}>{leave.reason}</td>
                 <td style={tdStyle}>{leave.fromDate}</td>
@@ -419,13 +444,13 @@ function LeaveManagement({ leaves, handleLeaveAction }) {
                   {leave.status === "Pending" && (
                     <>
                       <button
-                        onClick={() => handleLeaveAction(leave._id, "approve")}
+                        onClick={() => handleLeaveAction(leave._id || leave.id, "approve")}
                         style={approveBtn}
                       >
                         <FaCheckCircle /> Approve
                       </button>
                       <button
-                        onClick={() => handleLeaveAction(leave._id, "reject")}
+                        onClick={() => handleLeaveAction(leave._id || leave.id, "reject")}
                         style={rejectBtn}
                       >
                         <FaTimesCircle /> Reject
@@ -471,17 +496,17 @@ function MessageManagement({ messages, handleDeleteMessage }) {
           </thead>
           <tbody>
             {messages.map((msg) => (
-              <tr key={msg._id} style={trStyle}>
+              <tr key={msg._id || msg.id} style={trStyle}>
                 <td style={tdStyle}>{msg.name}</td>
                 <td style={tdStyle}>{msg.email}</td>
                 <td style={tdStyle}>{msg.phone}</td>
                 <td style={tdStyle}>{msg.message}</td>
                 <td style={tdStyle}>
-                  {new Date(msg.createdAt).toLocaleString()}
+                  {msg.createdAt ? new Date(msg.createdAt).toLocaleString() : "N/A"}
                 </td>
                 <td style={tdStyle}>
                   <button
-                    onClick={() => handleDeleteMessage(msg._id)}
+                    onClick={() => handleDeleteMessage(msg._id || msg.id)}
                     style={deleteBtn}
                   >
                     <FaTrash /> Delete
