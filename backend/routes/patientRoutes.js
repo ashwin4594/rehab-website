@@ -4,47 +4,70 @@ const Appointment = require("../models/Appointment");
 
 /**
  * 🩺 POST — Book an Appointment
- * Called from Home page form when patient books an appointment.
+ * Called when a patient books an appointment.
  */
 router.post("/book", async (req, res) => {
   try {
-    const { patientName, phone, date, reason } = req.body;
+    const { doctorName, patientName, phone, date, reason } = req.body;
 
-    // Validate required fields
+    // 🧩 Validate required fields
     if (!patientName || !phone || !date || !reason) {
       return res.status(400).json({ message: "All fields are required." });
     }
 
-    // Create a new appointment
+    // 🩹 Assign a doctor or default to “All Doctors” if not chosen
+    const assignedDoctor = doctorName && doctorName.trim() !== "" ? doctorName : "All Doctors";
+
+    // 💾 Create and save the appointment
     const newAppointment = new Appointment({
+      doctorName: assignedDoctor,
       patientName,
       phone,
       date,
       reason,
-      doctorName: "All Doctors", // ✅ Default visible to all doctors
       status: "Scheduled",
     });
 
     await newAppointment.save();
 
-    res.status(201).json({ message: "Appointment booked successfully!" });
+    console.log("✅ Appointment booked:", newAppointment);
+
+    return res.status(201).json({
+      message: "Appointment booked successfully!",
+      appointment: newAppointment,
+    });
   } catch (error) {
-    console.error("Error booking appointment:", error);
-    res.status(500).json({ message: "Failed to book appointment" });
+    console.error("❌ Error booking appointment:", error.message);
+    return res.status(500).json({ message: "Failed to book appointment" });
   }
 });
 
 /**
- * 🧾 GET — Fetch all Appointments
- * Used by the doctor dashboard to show booked patients.
+ * 📋 GET — Fetch All Appointments
+ * Used by doctors or admin to view all patient bookings.
  */
 router.get("/appointments", async (req, res) => {
   try {
     const appointments = await Appointment.find().sort({ createdAt: -1 });
-    res.status(200).json(appointments);
+    return res.status(200).json(appointments);
   } catch (error) {
-    console.error("Error fetching appointments:", error);
-    res.status(500).json({ message: "Error fetching appointments" });
+    console.error("❌ Error fetching appointments:", error.message);
+    return res.status(500).json({ message: "Error fetching appointments" });
+  }
+});
+
+/**
+ * 🗑️ DELETE — Cancel Appointment
+ * (Optional) Allows admin or patient to cancel a booking.
+ */
+router.delete("/appointments/:id", async (req, res) => {
+  try {
+    const deleted = await Appointment.findByIdAndDelete(req.params.id);
+    if (!deleted) return res.status(404).json({ message: "Appointment not found" });
+    return res.status(200).json({ message: "Appointment cancelled successfully" });
+  } catch (error) {
+    console.error("❌ Error cancelling appointment:", error.message);
+    return res.status(500).json({ message: "Error cancelling appointment" });
   }
 });
 

@@ -4,8 +4,8 @@ const Leave = require("../models/Leave");
 
 /**
  * ===================================================
- * 🧑‍💼 ADMIN ROUTES — USERS | LEAVES | DOCTORS
- * Includes Real-Time Notifications via Socket.IO
+ * 🧑‍💼 ADMIN ROUTES — USERS | DOCTORS | LEAVES
+ * With Real-Time Notifications via Socket.IO
  * ===================================================
  */
 
@@ -20,8 +20,8 @@ module.exports = (io, connectedDoctors) => {
       const users = await User.find().select("name email role isApproved createdAt");
       res.status(200).json(users);
     } catch (err) {
-      console.error("❌ Error fetching users:", err);
-      res.status(500).json({ message: "❌ Failed to fetch users" });
+      console.error("❌ Error fetching users:", err.message);
+      res.status(500).json({ message: "Failed to fetch users" });
     }
   });
 
@@ -30,31 +30,55 @@ module.exports = (io, connectedDoctors) => {
     try {
       const deleted = await User.findByIdAndDelete(req.params.id);
       if (!deleted)
-        return res.status(404).json({ message: "⚠️ User not found" });
-      res.status(200).json({ message: "✅ User deleted successfully" });
+        return res.status(404).json({ message: "User not found" });
+
+      res.status(200).json({ message: "User deleted successfully" });
     } catch (err) {
-      console.error("❌ Error deleting user:", err);
-      res.status(500).json({ message: "❌ Failed to delete user" });
+      console.error("❌ Error deleting user:", err.message);
+      res.status(500).json({ message: "Failed to delete user" });
     }
   });
 
   /* -------------------- 🩺 DOCTOR APPROVAL MANAGEMENT -------------------- */
 
-  // ✅ Get pending doctor approvals
+  // ✅ Fetch pending doctors (for admin approval)
   router.get("/pending-doctors", async (req, res) => {
     try {
       const pendingDoctors = await User.find({
         role: "doctor",
         isApproved: false,
-      }).select("name email createdAt");
-      res.status(200).json(pendingDoctors);
+      }).select("name email institution createdAt");
+
+      if (!pendingDoctors.length) {
+        return res.status(200).json({
+          message: "No pending doctors found",
+          doctors: [],
+        });
+      }
+
+      res.status(200).json({ doctors: pendingDoctors });
     } catch (err) {
-      console.error("❌ Error fetching pending doctors:", err);
-      res.status(500).json({ message: "❌ Failed to fetch pending doctors" });
+      console.error("❌ Error fetching pending doctors:", err.message);
+      res.status(500).json({ message: "Failed to fetch pending doctors" });
     }
   });
 
-  // ✅ Approve doctor
+  // ✅ Fetch approved doctors (for admin reference)
+  router.get("/approved-doctors", async (req, res) => {
+    try {
+      const approvedDoctors = await User.find({
+        role: "doctor",
+        isApproved: true,
+      }).select("name email institution createdAt");
+
+      res.status(200).json({ doctors: approvedDoctors });
+    } catch (err) {
+      console.error("❌ Error fetching approved doctors:", err.message);
+      res.status(500).json({ message: "Failed to fetch approved doctors" });
+    }
+  });
+
+  // ✅ Approve a doctor
   router.put("/approve-doctor/:id", async (req, res) => {
     try {
       const doctor = await User.findByIdAndUpdate(
@@ -64,9 +88,9 @@ module.exports = (io, connectedDoctors) => {
       );
 
       if (!doctor)
-        return res.status(404).json({ message: "⚠️ Doctor not found" });
+        return res.status(404).json({ message: "Doctor not found" });
 
-      // 🔔 Real-time notification to doctor
+      // 🔔 Real-time notification (if doctor connected)
       const doctorSocket = connectedDoctors[doctor.email];
       if (doctorSocket) {
         io.to(doctorSocket).emit("approvalUpdate", {
@@ -76,23 +100,23 @@ module.exports = (io, connectedDoctors) => {
       }
 
       res.status(200).json({
-        message: "✅ Doctor approved successfully",
+        message: "Doctor approved successfully!",
         doctor,
       });
     } catch (err) {
-      console.error("❌ Error approving doctor:", err);
-      res.status(500).json({ message: "❌ Failed to approve doctor" });
+      console.error("❌ Error approving doctor:", err.message);
+      res.status(500).json({ message: "Failed to approve doctor" });
     }
   });
 
-  // ✅ Reject doctor
+  // ✅ Reject doctor (delete from DB)
   router.delete("/reject-doctor/:id", async (req, res) => {
     try {
       const doctor = await User.findByIdAndDelete(req.params.id);
       if (!doctor)
-        return res.status(404).json({ message: "⚠️ Doctor not found" });
+        return res.status(404).json({ message: "Doctor not found" });
 
-      // 🔔 Notify doctor (if connected)
+      // 🔔 Notify doctor if connected
       const doctorSocket = connectedDoctors[doctor.email];
       if (doctorSocket) {
         io.to(doctorSocket).emit("approvalUpdate", {
@@ -101,10 +125,10 @@ module.exports = (io, connectedDoctors) => {
         });
       }
 
-      res.status(200).json({ message: "❌ Doctor rejected and removed successfully" });
+      res.status(200).json({ message: "Doctor rejected and removed successfully" });
     } catch (err) {
-      console.error("❌ Error rejecting doctor:", err);
-      res.status(500).json({ message: "❌ Failed to reject doctor" });
+      console.error("❌ Error rejecting doctor:", err.message);
+      res.status(500).json({ message: "Failed to reject doctor" });
     }
   });
 
@@ -116,8 +140,8 @@ module.exports = (io, connectedDoctors) => {
       const leaves = await Leave.find().sort({ createdAt: -1 });
       res.status(200).json(leaves);
     } catch (err) {
-      console.error("❌ Error fetching leaves:", err);
-      res.status(500).json({ message: "❌ Failed to fetch leave requests" });
+      console.error("❌ Error fetching leaves:", err.message);
+      res.status(500).json({ message: "Failed to fetch leave requests" });
     }
   });
 
@@ -131,7 +155,7 @@ module.exports = (io, connectedDoctors) => {
       );
 
       if (!leave)
-        return res.status(404).json({ message: "⚠️ Leave not found" });
+        return res.status(404).json({ message: "Leave not found" });
 
       // 🔔 Notify doctor
       const doctorSocket = connectedDoctors[leave.name];
@@ -143,12 +167,12 @@ module.exports = (io, connectedDoctors) => {
       }
 
       res.status(200).json({
-        message: `✅ Leave approved for ${leave.name}`,
+        message: `Leave approved for ${leave.name}`,
         leave,
       });
     } catch (err) {
-      console.error("❌ Error approving leave:", err);
-      res.status(500).json({ message: "❌ Failed to approve leave" });
+      console.error("❌ Error approving leave:", err.message);
+      res.status(500).json({ message: "Failed to approve leave" });
     }
   });
 
@@ -162,7 +186,7 @@ module.exports = (io, connectedDoctors) => {
       );
 
       if (!leave)
-        return res.status(404).json({ message: "⚠️ Leave not found" });
+        return res.status(404).json({ message: "Leave not found" });
 
       // 🔔 Notify doctor
       const doctorSocket = connectedDoctors[leave.name];
@@ -174,12 +198,12 @@ module.exports = (io, connectedDoctors) => {
       }
 
       res.status(200).json({
-        message: `❌ Leave rejected for ${leave.name}`,
+        message: `Leave rejected for ${leave.name}`,
         leave,
       });
     } catch (err) {
-      console.error("❌ Error rejecting leave:", err);
-      res.status(500).json({ message: "❌ Failed to reject leave" });
+      console.error("❌ Error rejecting leave:", err.message);
+      res.status(500).json({ message: "Failed to reject leave" });
     }
   });
 

@@ -154,7 +154,7 @@ export default function PatientDashboard() {
             fontWeight: "bold",
           }}
         >
-          🏥 MediCare
+          {/* 🏥 MediCare */}
         </h2>
         <div
           style={{
